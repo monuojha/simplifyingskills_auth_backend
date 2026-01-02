@@ -3,6 +3,13 @@ const app = express();
 const PORT = 3000;
 
 import authRoutes from './routes/authRoutes.js';
+import connectDB from './config/db.js';
+
+connectDB();
+
+app.use(express.json());
+
+
 
 app.use('/api/auth', authRoutes);
 

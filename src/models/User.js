@@ -1,16 +1,16 @@
 import mongoose from "mongoose";
-import bcrypt from "bcryptjs";
+import bcrypt from "bcrypt";
 
 const userSchema = new mongoose.Schema(
   {
-    studentName: {
+    studentname: {
       type: String,
       required: [true, "Student Name is required"],
       trim: true,
     },
     class: {
       type: String,
-      
+      trim: true,
     },
     school: {
       type: String,
@@ -26,29 +26,22 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, "Mobile number is required"],
       unique: true,
-
-            },
-   
+      trim: true,
+    },
     email: {
       type: String,
       required: [true, "Email is required"],
       unique: true,
       lowercase: true,
       trim: true,
-
     },
     gender: {
       type: String,
-      required: [true, "Gender is required"],
-      enum: {
-        values: ["Male", "Female", "Other"],
-        message: "Gender must be Male, Female, or Other",
-      },
+      trim: true,
     },
     password: {
       type: String,
       required: [true, "Password is required"],
-      minlength: [8, "Password must be at least 8 characters long"],
     },
     isVerified: {
       type: Boolean,
@@ -65,21 +58,21 @@ const userSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true, // Adds createdAt and updatedAt automatically
+    timestamps: true,
   }
 );
 
 
-userSchema.pre("save", async function (next) {
-
+userSchema.pre("save", async function () {
+  // If password is not modified, skip hashing
+  if (!this.isModified("password")) {
+    return;
+  }
 
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
-  next();
 });
 
 
-
 const User = mongoose.model("User", userSchema);
-
 export default User;
