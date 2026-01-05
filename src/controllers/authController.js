@@ -21,6 +21,17 @@ const generateRefreshToken = (id) => {
 };
 
 
+// otp-generate
+const generateOTP = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+// otp expiry time
+const getOTPExpiryTime = () => {
+  return new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
+};
+
+
 
 
 const register = async (req, res) => {
@@ -159,9 +170,6 @@ try {
 const login = async (req, res) => {
 
 
-  // Implementation here
-
-
   const { email, password } = req.body;
   try {
 
@@ -181,6 +189,9 @@ const login = async (req, res) => {
 
     const accessToken = generateAccessToken(user._id);
     const refreshToken = generateRefreshToken(user._id);
+
+    user.refreshToken = refreshToken;
+    await user.save();
     res.status(200).json({
       message: "Login successful",
       accessToken,
@@ -213,11 +224,15 @@ const logout = async (req, res) => {
   // Implementation here
 
   const { refreshToken } = req.body;
+ 
 
   try {
     if (!refreshToken) {
       return res.status(400).json({ message: "Refresh token is required" });
     }
+
+    console.log("Refresh Token:", refreshToken);
+    console.log("JWT_REFRESH_SECRET:", process.env.JWT_REFRESH_SECRET);
 
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
     const userId = decoded.id;
@@ -233,4 +248,134 @@ const logout = async (req, res) => {
     });
   }
 }
-export { register, verifyOTP, login,  logout};
+
+const forgotPassword = async (req, res) => {
+
+  const { email } = req.body;
+  try {
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ message: "Email not found" });
+    }
+
+
+   
+
+    const otp = generateOTP();
+    const otpExpiresAt = getOTPExpiryTime();
+    user.otp = otp;
+    user.otpExpiresAt = otpExpiresAt;
+    await user.save();
+  
+
+    res.status(200).json({
+      message: "OTP for password reset generated successfully",
+      // For testing purposes only – remove in production
+      otp,
+    }); 
+    
+  } catch (error) {
+    console.error("Forgot Password error:", error);
+    res.status(500).json({
+      message: "Server error during password reset",
+      error: error.message,
+    });
+  }
+  // Implementation here
+}
+
+const newPassword = async (req, res) => {
+  // Implementation here
+
+  const { email, otp, password } = req.body;
+  try {
+
+    if (!email || !otp || !password) {
+      return res.status(400).json({ message: "Email, OTP, and new password are required" });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user || user.otp !== otp || user.otpExpiresAt < Date.now()) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
+    }
+
+    user.password = password;
+    user.otp = null;
+    user.otpExpiresAt = null;
+    await user.save();
+
+
+    res.status(200).json({ message: "Password updated successfully" });
+  } catch (error) {
+    console.error("New Password error:", error);
+    res.status(500).json({
+      message: "Server error during setting new password",
+      error: error.message,
+    });
+  }
+}
+
+
+const getProfile = async (req, res) => {
+  // Implementation here
+
+  const userId = req.user.id;
+
+  try {
+    const user = await User.findById(userId).select("-password -otp -otpExpiresAt -refreshToken");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    } 
+
+    res.status(200).json(user);
+  } catch (error) {
+    console.error("Get Profile error:", error);
+    res.status(500).json({
+      message: "Server error during getting profile",
+      error: error.message,
+    });
+  }
+
+
+
+}
+
+
+const updateProfile = async (req, res) => {
+  const userId = req.user.id;
+ try {
+  const { studentname, class: userClass, school, address, mobile, email, gender } = req.body;
+
+  const user = await User.findById(userId);
+
+  if (!user) {
+    return res.status(404).json({ message: "User not found" });
+  }
+
+  user.studentname = studentname;
+  user.class = userClass;
+  user.school = school;
+  user.address = address;
+  user.mobile = mobile;
+  user.email = email;
+  user.gender = gender;
+
+ 
+    await user.save();
+    res.status(200).json({ message: "Profile updated successfully" });
+  } catch (error) {
+    console.error("Update Profile error:", error);
+    res.status(500).json({
+      message: "Server error during updating profile",
+      error: error.message,
+    });
+  }
+}
+
+
+export { register, verifyOTP, login,  logout, forgotPassword, newPassword, getProfile, updateProfile };
